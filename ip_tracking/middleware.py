@@ -1,6 +1,7 @@
 import logging
 from django.utils.timezone import now
-from .models import RequestLog
+from django.http import HttpResponseForbidden
+from .models import RequestLog, BlockedIP
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +15,10 @@ class IPTrackingMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Get client IP
         ip_address = self.get_client_ip(request)
         path = request.path
         timestamp = now()
 
-        # Save to DB
         try:
             RequestLog.objects.create(
                 ip_address=ip_address,
@@ -33,10 +32,32 @@ class IPTrackingMiddleware:
         return self.get_response(request)
 
     def get_client_ip(self, request):
-        """Extract client IP from request headers."""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[0]
         else:
             ip = request.META.get('REMOTE_ADDR', '')
+        return ip
+
+
+class BlockIPMiddleware:
+    """
+    Middleware to block requests from blocked IP addresses.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        ip = self.get_client_ip(request)
+        if BlockedIP.objects.filter(ip_address=ip).exists():
+            return HttpResponseForbidden("Your IP is blocked.")
+        return self.get_response(request)
+
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(",")[0]
+        else:
+            ip = request.META.get("REMOTE_ADDR", "")
         return ip

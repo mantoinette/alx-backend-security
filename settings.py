@@ -9,5 +9,6 @@ MIDDLEWARE = [
 
     # Add this line
     'ip_tracking.middleware.IPTrackingMiddleware',
+    'ip_tracking.middleware.BlockIPMiddleware',
 ]
 
